@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Earth Image Browser</title>
+        <link rel="stylesheet" type="text/css" href="epic.css"/>
+        <script src="script.js"></script>
+    </head>
+
+    <body>
+        <header>
+            <h1>EPIC Image Browser</h1>
+            <form id="request_form">
+                <div>
+                    <label>Image type:</label>
+                    <select id="type" name="type">
+                        <option value="natural">Natural</option>
+                        <option value="enhanced">Enhanced</option>
+                        <option value="aerosol">Aerosol</option>
+                        <option value="cloud">Cloud</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Date:</label>
+                    <input type="date" id="date" name="date"/>
+                </div>
+                <button type="submit">Submit</button>
+            </form>
+            
+            <ul id="image-menu">
+            </ul>
+        </header>
+
+        <main>
+            <img id="earth-image" src="" alt="image of earth generated from selected date">
+
+            <footer>
+                <div id="earth-image-date"></div> 
+                <div id="earth-image-title"></div>
+            </footer>
+        </main>
+
+        <template id="image-menu-item">
+            <li data-image-list-index=""><span class="image-list-title"></span></li>
+        </template>
+    </body>
+</html>
