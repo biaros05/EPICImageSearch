@@ -1,41 +1,113 @@
 "use strict";
 !(function(){
 
-  let images = [];
-  let type = "";
+  const TYPES = ["natural","enhanced", "aerosol","cloud"];
+  const EpicApplication = {
+    images : [],
+    type : "",
+    dateCache: {},
+    imageCache: {}
+  };
 
   document.addEventListener("DOMContentLoaded", function(e) {
-    fetchAndSetMaxDate();
+
+    let currentlySelectedDate = ""; // represents the date selected when the user submits (does NOT dynamically change in between submissions)
+
+    setOptions();
+    setCache();
+    EpicApplication.type = document.getElementById("type").value;
+    fetchAndSetMaxDate(EpicApplication.type);
+
     document.getElementById("request_form").addEventListener("submit", function(e){
       e.preventDefault();
-      Array.from(document.getElementById("image-menu").children)
-      .forEach((li) => li.remove());
-      fetchData();
+      EpicApplication.type = document.getElementById("type").value; // log SELECTED type (does NOT dynamically change between submissions)
+      currentlySelectedDate = document.getElementById("date").value;
+      if (EpicApplication.imageCache[EpicApplication.type].get(currentlySelectedDate) === undefined) 
+      {
+        fetchData();
+      }
+      else 
+      {
+        generateImageLI(EpicApplication.imageCache[EpicApplication.type].get(currentlySelectedDate));
+      }
     });
 
     document.getElementById("image-menu").addEventListener("click", function(e){ 
       let index = e.target.parentElement.getAttribute("data-image-list-index");
-      imageSetup(index);
+      imageSetup(EpicApplication.imageCache[EpicApplication.type].get(currentlySelectedDate)[index]);
     });
 
+    // generating new maxDate for the image that they select, however do NOT relog that image until they resubmit.
     document.getElementById("type").addEventListener("change", function(e){
-      fetchAndSetMaxDate();
-    })
-    
+      let currentlySelectedType = e.target.value;
+      if (EpicApplication.dateCache[currentlySelectedType] === null) 
+      {
+        fetchAndSetMaxDate(currentlySelectedType);
+      }
+      else
+      {
+        document.getElementById("date").max = EpicApplication.dateCache[currentlySelectedType];
+      }
+    });
+
   });
 
   /**
-   * this function sets up the image
-   * @param {Number} index - represents the index of the image the user has clicked
+     * this function generates the LI for a particular array of images
+     * @param {Array} images - represents the array of images
+     */
+  function generateImageLI(images)
+  {
+    Array.from(document.getElementById("image-menu").children)
+    .forEach((li) => li.remove());
+
+    images
+    .forEach(
+      (img) => generateRow(img.date, true)
+    );
+    if (images.length === 0)
+    {
+      generateRow("No image was found!", false);
+    }
+  }
+
+  /**
+   * this function generates the option DOM elements based on the types
    */
-  function imageSetup(index){
-    let splitDate = images[index].date.match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}/)[0];
+  function setOptions()
+  {
+    const select = document.getElementById("type");
+    TYPES.forEach((el) => {
+      let option = document.createElement("option");
+      option.textContent = el;
+      option.value = el;
+      select.appendChild(option);
+    })
+  }
+
+  /**
+   * this function sets the keys of the dateCache variable based on the types given in the array
+   */
+  function setCache()
+  {
+    TYPES.forEach((el) => {
+      EpicApplication.dateCache[el] = null;
+      EpicApplication.imageCache[el] = new Map();
+    });
+  }
+
+  /**
+   * this function sets up the image
+   * @param {DOMElement} imageSelected - represents the image the user has clicked
+   */
+  function imageSetup(imageSelected){
+    let splitDate = imageSelected.date.match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}/)[0];
     splitDate = splitDate.split("-");
-    const imageFile = images[index].image;
-    const url = `https://epic.gsfc.nasa.gov/archive/${type}/${splitDate[0]}/${splitDate[1]}/${splitDate[2]}/jpg/${imageFile}.jpg`;
+    const imageFile = imageSelected.image;
+    const url = `https://epic.gsfc.nasa.gov/archive/${EpicApplication['type']}/${splitDate[0]}/${splitDate[1]}/${splitDate[2]}/jpg/${imageFile}.jpg`;
     document.getElementById("earth-image").src = url;
-    document.getElementById("earth-image-date").textContent = images[index].date;
-    document.getElementById("earth-image-title").textContent = images[index].caption;
+    document.getElementById("earth-image-date").textContent = imageSelected.date;
+    document.getElementById("earth-image-title").textContent = imageSelected.caption;
     document.getElementById("earth-image").style.visibility = "visible";
   }
 
@@ -43,9 +115,8 @@
    * this function fetches the latest date a picture was taken and sets the maximum date in
    * the date input to be of that date
    */
-  function fetchAndSetMaxDate(){
-    type = document.getElementById("type").value;
-    fetch(`https://epic.gsfc.nasa.gov/api/${type}/all`, {})
+  function fetchAndSetMaxDate(currentlySelectedType){
+    fetch(`https://epic.gsfc.nasa.gov/api/${currentlySelectedType}/all`, {})
         .then( response => { 
             // Stage 1: Take in a response and verify if it's OK      
             if( !response.ok ) { 
@@ -55,10 +126,9 @@
             // If the response is OK, deserialize it.
             return response.json();
         })
-
         .then( obj => {
             // Stage 2: Take the de-serialized response and do something with it
-            let date = obj.map((el) => {
+            let maxDate = obj.map((el) => {
               return(new Date(el.date));
             })
             .toSorted((a, b) => {
@@ -66,10 +136,10 @@
               else if (a > b) {return -1;}
               else {return 0;}
             })[0];
-            let splitDate = date.toISOString().match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}/)[0]; // YYY-MM-DD
-            document.getElementById("date").max = splitDate;
+            let splitDate = maxDate.toISOString().match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}/)[0]; // YYY-MM-DD
+            EpicApplication.dateCache[currentlySelectedType] = splitDate;
+            document.getElementById("date").max = EpicApplication.dateCache[currentlySelectedType];
         })
-
         .catch( err => {
             // Stage 3: Handle any errors
             console.error("3)Error:", err);
@@ -85,10 +155,8 @@
    */
   function fetchData()
   {
-    type = document.getElementById("type").value;
-    let date = document.getElementById("date").value;
-    console.log(date)
-    fetch(`https://epic.gsfc.nasa.gov/api/${type}/date/${date}`, {})
+    let selectedDate = document.getElementById("date").value;
+    fetch(`https://epic.gsfc.nasa.gov/api/${EpicApplication.type}/date/${selectedDate}`, {})
         .then( response => { 
             // Stage 1: Take in a response and verify if it's OK
             if( !response.ok ) { 
@@ -98,17 +166,12 @@
             // If the response is OK, deserialize it.
             return response.json();
         })
-
         .then( obj => {
             // Stage 2: Take the de-serialized response and do something with it
-            obj.forEach((img) => generateRow(img.date, true));
-            images = obj;
-            if (images.length === 0)
-            {
-              generateRow("No image was found!", false);
-            }
+            EpicApplication.images = obj;
+            generateImageLI(obj);
+            EpicApplication.imageCache[EpicApplication.type].set(selectedDate, obj);
         })
-
         .catch( err => {
             // Stage 3: Handle any errors
             console.error("3)Error:", err);
@@ -138,4 +201,5 @@
     }
     ul.appendChild(newLi);
   }
+
 }());
